@@ -137,7 +137,7 @@ function paintTools() {
 }
 function count() {
   const all = document.querySelectorAll('.ing li').length, done = document.querySelectorAll('.ing li.done').length;
-  const c = $('#ingCount'); if (c) c.textContent = all ? `${done} of ${all}` : '';
+  const c = $('#ingCount'); if (c) c.textContent = all ? `${done} of ${all}${done === all ? ' 🎉' : ''}` : '';
 }
 function markNow() {   // highlight the first step that isn't done yet
   const steps = [...document.querySelectorAll('.steps li')];
@@ -149,7 +149,20 @@ document.addEventListener('click', e => {
 });
 
 /* ── page ── */
+// A shopping list: aisles with items to tick off (ticks kept on this phone)
+function renderList(r) {
+  let n = 0;
+  const groups = (r.g || []).map(([aisle, items]) => `<section><h2>${esc(aisle)}</h2>
+    <ul class="ing">${items.map(x => { const i = n++; return `<li data-act="ing" data-i="${i}" class="${memory.i.includes(i) ? 'done' : ''}">${esc(x)}</li>`; }).join('')}</ul></section>`).join('');
+  $('#app').innerHTML = `
+    <div class="bar"><div class="name">${esc(r.k || 'Recipe Box')}</div><div id="tools" style="display:flex;gap:6px"></div></div>
+    <div class="hero"><div class="emo">🛒</div><h1>Shopping list</h1><div class="meta"><span id="ingCount"></span></div></div>
+    ${groups || '<div class="empty"><p>Nothing on the list.</p></div>'}
+    <div class="foot"><button class="tool" data-act="reset">↺ Untick everything</button><p>${r.d ? 'from' : 'made with 💕 in'} ${esc(r.k || 'Recipe Box')}</p></div>`;
+  paintTools(); count();
+}
 function render(r) {
+  if (r.type === 'list') return renderList(r);
   const meta = [r.c && `${r.c}`, r.m && `⏱ ${r.m}`, r.s && `🍽 Serves ${r.s}`].filter(Boolean).map(x => `<span>${esc(x)}</span>`).join('');
   $('#app').innerHTML = `
     <div class="bar"><div class="name">${esc(r.k || 'Recipe Box')}</div><div id="tools" style="display:flex;gap:6px"></div></div>
@@ -170,7 +183,8 @@ function render(r) {
   try { r = await readRecipe(); }
   catch { $('#app').innerHTML = `<div class="empty"><div class="big">😕</div><h2>Couldn't open this recipe</h2><p>Try scanning the code again. If it keeps happening, this phone's browser may be too old.</p></div>`; return; }
   if (!r) { $('#app').innerHTML = `<div class="empty"><div class="big">📱</div><h2>Ready for a recipe!</h2><p>Open a recipe in the Recipe Box app, tap <b>📱 Open on my phone</b>, and scan the code with this phone's camera.</p></div>`; return; }
-  applyLook(r); render(r); Awake.on();
+  applyLook(r); render(r);
+  if (r.type !== 'list') Awake.on();           // keep the screen on for cooking (not needed in the store)
 })();
 </script>
 </body>
