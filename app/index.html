@@ -732,6 +732,7 @@ const AI = {
     if (!res.ok) {
       const msg = data?.error?.message || `Gemini error ${res.status}`;
       const err = new Error(msg);
+      if (/limit:\s*0/i.test(msg)) Store.set('noFreeModels', [...new Set([...Store.get('noFreeModels', []), model])], {sync: false});
       // busy / overloaded / out of free quota for this model / model retired → try another model
       err.busy = [429, 500, 503, 404].includes(res.status) || /overload|demand|unavailable|quota|exhausted/i.test(msg);
       throw err;
@@ -752,12 +753,13 @@ const AI = {
         AI._list = (data.models || [])
           .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
           .map(m => m.name.replace(/^models\//, ''))
-          .filter(n => /flash/i.test(n) && !/image|tts|audio|live|embed|preview|exp|think/i.test(n))
+          .filter(n => /flash/i.test(n) && !/image|tts|audio|live|embed|preview|exp|think|omni|computer/i.test(n))
           .sort((a, b) => (/lite/i.test(a) - /lite/i.test(b)) || b.localeCompare(a, undefined, {numeric: true}));
       } catch {}
     }
+    const noFree = Store.get('noFreeModels', []);          // models that said "limit: 0" for this key
     return [...new Set([s.workingModel, s.model, ...CONFIG.ai.backupModels, ...AI._list].filter(Boolean))]
-      .slice(0, CONFIG.ai.maxModels);
+      .filter(m => !noFree.includes(m)).slice(0, CONFIG.ai.maxModels);
   },
 
   parseJSON(text) {
@@ -884,7 +886,7 @@ Random seed (ignore): ${Math.random().toString(36).slice(2)}`;
     }
     say('✅ Google answered and the key is real.', 'good');
     AI._list = null;
-    const models = (await AI.modelsToTry()).slice(0, 4);
+    const models = (await AI.modelsToTry()).slice(0, 6);
     say('2. Trying the Gemini models one at a time…');
     for (const m of models) {
       try {
@@ -900,7 +902,7 @@ Random seed (ignore): ${Math.random().toString(36).slice(2)}`;
         say(`• ${m}: ${why}`, 'bad');
       }
     }
-    say("❌ None of the models answered. Send Claude a picture of this box.", 'bad');
+    say("❌ None of the models answered just now. If they say \"busy\", wait a few minutes and try again — otherwise send Claude a picture of this box.", 'bad');
   },
   // Check several recipes against our diet in one request
   async dietCheck(recipes) {
